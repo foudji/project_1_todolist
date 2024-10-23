@@ -1,6 +1,8 @@
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs::{self, read_to_string}, io::{self, Read}, path, sync::TryLockResult
+    fs::{self, read_to_string},
+    io::{self},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -8,14 +10,14 @@ struct Todo {
     content: String,
 }
 
+#[derive(Parser)]
+struct Flag {
+    #[arg(long, short)]
+    delete: Option<usize>,
+}
+
 fn main() {
-    println!("Veuillez entrer une tâche que vous souhaitez accomplir :");
-
-    let mut input = String::new();
-
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Impossible d'accéder à l'input de l'utilisateur");
+    let flag: Flag = Flag::parse();
 
     let mut todos: Vec<Todo> = match read_to_string("todolist.json") {
         Ok(file_content) => {
@@ -24,23 +26,32 @@ fn main() {
         Err(_) => Vec::new(),
     };
 
-    let input = input.trim();
-    
-    if input.contains("--delete") {
-        let condition = input.split(" ").last().expect("Cannot find the task");
-        let todo_number: usize = condition.parse().expect("Cannot convert to number");
-        todos.remove(todo_number - 1);
-    };
+    if let Some(index) = flag.delete {
+        if index > 0 && index <= todos.len() {
+            todos.remove(index - 1);
+            let _ = fs::write(
+                "todolist.json",
+                serde_json::to_string(&todos).expect("Impossible de créer un fichier pour la todo"),
+            );
+        }
+    } else {
+        println!("Veuillez entrer une tâche que vous souhaitez accomplir :");
 
-    todos.push(Todo {
-        content: input.to_string(),
-    });
+        let mut input = String::new();
 
-    let _ = fs::write(
-        "todolist.json",
-        serde_json::to_string(&todos).expect("Impossible de créer un fichier pour la todo"),
-    );
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Impossible d'accéder à l'input de l'utilisateur");
 
+        let input = input.trim();
 
+        todos.push(Todo {
+            content: input.to_string(),
+        });
 
+        let _ = fs::write(
+            "todolist.json",
+            serde_json::to_string(&todos).expect("Impossible de créer un fichier pour la todo"),
+        );
+    }
 }
